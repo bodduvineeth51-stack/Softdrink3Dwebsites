@@ -114,17 +114,18 @@ export default function CommercialSection() {
           window.dispatchEvent(new Event('canvas:pause'))
 
           if (video) {
-            // Play strategy: try unmuted first (works when user has scrolled =
-            // interacted). If the browser's autoplay policy blocks it, fall back
-            // to muted-start then immediately unmute — this always succeeds.
+            // Always start muted — browsers unconditionally allow muted autoplay
+            // even from IntersectionObserver (non-gesture) callbacks.
+            // video.play() resolves only once the first frame is rendering, so
+            // setting muted = false immediately after gives seamless audio from
+            // frame 0 with zero user interaction required.
             const doPlay = async () => {
               try {
-                video.muted = false
-                await video.play()
-              } catch {
                 video.muted = true
-                await video.play().catch(() => {})
-                video.muted = false   // unmute once the browser lets us play
+                await video.play()
+                video.muted = false   // unmute the moment playback is confirmed
+              } catch {
+                // blocked entirely (e.g. no src yet) — nothing to do
               }
             }
 
