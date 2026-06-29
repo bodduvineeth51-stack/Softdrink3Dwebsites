@@ -68,8 +68,8 @@ export default function CommercialSection() {
   const timeDisplayRef  = useRef(null)
   const lightSweepRef   = useRef(null)
   const floatRef        = useRef(null)
-  const mouseTiltRaf    = useRef(null)   // rAF gate for mouse parallax
-  const pendingPlayRef  = useRef(null)   // canplay callback ref — shared with video:pause handler
+  const mouseTiltRaf = useRef(null)   // rAF gate for mouse parallax
+  const isActiveRef  = useRef(false)  // true while Commercial is the visible section
 
   const labelRef           = useRef(null)
   const headingRef         = useRef(null)
@@ -97,58 +97,38 @@ export default function CommercialSection() {
 
   // ── Section visibility: video play/pause + background canvas control ──────
   //
-  // A single IntersectionObserver at threshold 0.5 handles both:
-  //   1. Video  — plays with sound when active, pauses+resets when leaving
-  //   2. Canvas — dispatches canvas:pause so Hero+Ingredients rAF loops stop
-  //               (they can't stop themselves because they're geometrically
-  //               "visible" inside the pinned container even when hidden at z<3)
+  // videoSrc is included in the deps intentionally:
+  //   IntersectionObserver fires immediately on observe() with the current state.
+  //   When videoSrc arrives (2 s after mount) and the section is already visible,
+  //   the observer is recreated → fires → calls play() with the now-ready src.
+  //   Without this, a fast scroll to Commercial before 2 s leaves the video silent.
   useEffect(() => {
     const section = sectionRef.current
     if (!section) return
 
     const obs = new IntersectionObserver(
       ([entry]) => {
+        isActiveRef.current = entry.isIntersecting
         const video = videoRef.current
 
         if (entry.isIntersecting) {
           window.dispatchEvent(new Event('canvas:pause'))
 
-          if (video) {
-            // Always start muted — browsers unconditionally allow muted autoplay
-            // even from IntersectionObserver (non-gesture) callbacks.
-            // video.play() resolves only once the first frame is rendering, so
-            // setting muted = false immediately after gives seamless audio from
-            // frame 0 with zero user interaction required.
-            const doPlay = async () => {
-              try {
-                video.muted = true
-                await video.play()
-                video.muted = false   // unmute the moment playback is confirmed
-              } catch {
-                // blocked entirely (e.g. no src yet) — nothing to do
-              }
-            }
-
-            pendingPlayRef.current = doPlay
-
-            if (video.readyState >= 3) {
-              doPlay()
-              pendingPlayRef.current = null
-            } else {
-              video.addEventListener('canplay', doPlay, { once: true })
-            }
+          if (video && videoSrc) {
+            // Muted play is unconditionally allowed from async contexts.
+            // Unmute immediately after the play() Promise resolves (first frame ready).
+            video.muted = true
+            video.play()
+              .then(() => { video.muted = false })
+              .catch(() => {})
           }
         } else {
           window.dispatchEvent(new Event('canvas:resume'))
 
           if (video) {
-            if (pendingPlayRef.current) {
-              video.removeEventListener('canplay', pendingPlayRef.current)
-              pendingPlayRef.current = null
-            }
             video.pause()
             video.currentTime = 0
-            video.muted = true   // reset so next entry starts with muted fallback fresh
+            video.muted = true
           }
         }
       },
@@ -157,7 +137,7 @@ export default function CommercialSection() {
 
     obs.observe(section)
     return () => obs.disconnect()
-  }, [])
+  }, [videoSrc])
 
   // ── video:pause global event — fired by Contact section when it becomes active.
   // The IntersectionObserver above can't detect that Commercial is visually covered
@@ -167,13 +147,10 @@ export default function CommercialSection() {
     const stopVideo = () => {
       const video = videoRef.current
       if (!video) return
-      if (pendingPlayRef.current) {
-        video.removeEventListener('canplay', pendingPlayRef.current)
-        pendingPlayRef.current = null
-      }
       video.pause()
       video.currentTime = 0
-      video.muted = true   // reset so next entry uses muted-start fallback fresh
+      video.muted = true
+      isActiveRef.current = false
     }
 
     window.addEventListener('video:pause', stopVideo)
