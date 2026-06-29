@@ -1,0 +1,7 @@
+# Normalize line endings for text files
+* text=auto
+
+# Treat animation frames and video as binary — never touch line endings
+public/hero-frames/*.png        binary
+public/ingredients-frames/*.png binary
+public/video-asset/*.mp4        binary
