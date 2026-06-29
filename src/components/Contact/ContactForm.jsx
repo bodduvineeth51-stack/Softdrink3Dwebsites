@@ -82,6 +82,12 @@ export default function ContactForm({ onSuccess }) {
       onSuccess?.()
       riseParticles(containerRef.current)
 
+      // Identify this visitor in the Chatbase chat widget
+      window.chatbase?.('identify', {
+        user_id: form.email,
+        email:   form.email,
+      })
+
       // Reset after 3 s
       setTimeout(() => {
         setStatus('idle')

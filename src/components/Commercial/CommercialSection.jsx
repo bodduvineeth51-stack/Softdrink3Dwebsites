@@ -115,12 +115,7 @@ export default function CommercialSection() {
           window.dispatchEvent(new Event('canvas:pause'))
 
           if (video && videoSrc) {
-            // Muted play is unconditionally allowed from async contexts.
-            // Unmute immediately after the play() Promise resolves (first frame ready).
-            video.muted = true
-            video.play()
-              .then(() => { video.muted = false })
-              .catch(() => {})
+            video.play().catch(() => {})
           }
         } else {
           window.dispatchEvent(new Event('canvas:resume'))
@@ -128,7 +123,6 @@ export default function CommercialSection() {
           if (video) {
             video.pause()
             video.currentTime = 0
-            video.muted = true
           }
         }
       },
@@ -149,7 +143,6 @@ export default function CommercialSection() {
       if (!video) return
       video.pause()
       video.currentTime = 0
-      video.muted = true
       isActiveRef.current = false
     }
 
